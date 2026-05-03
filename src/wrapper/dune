@@ -5,6 +5,13 @@
   (with-stdout-to %{targets}
    (run sh %{deps}))))
 
+(rule
+ (targets static_link_flags.sexp)
+ (deps ../../scripts/gen-static-link-sexp.sh)
+ (action
+  (with-stdout-to %{targets}
+   (run sh %{deps} %{project_root}))))
+
 (library
  (name arrow_c_api)
  (public_name arrow.c_api)
@@ -20,9 +27,7 @@
  (c_library_flags
   :standard
   (:include rpath_flags.sexp)
-  -L%{project_root}/vendor/arrow-install/lib
-  -lparquet
-  -larrow
+  (:include static_link_flags.sexp)
   -lstdc++)
  (libraries base bigarray core_kernel ctypes ctypes.foreign ctypes.stubs stdio)
  (inline_tests)
@@ -33,9 +38,11 @@
  (section stublibs)
  (files
   (glob_files
-   (../../vendor/arrow-install/lib/libarrow* with_prefix .))
+   (../../vendor/arrow-install/lib/libarrow.a with_prefix .))
   (glob_files
-   (../../vendor/arrow-install/lib/libparquet* with_prefix .))))
+   (../../vendor/arrow-install/lib/libarrow_bundled_dependencies.a with_prefix .))
+  (glob_files
+   (../../vendor/arrow-install/lib/libparquet.a with_prefix .))))
 
 (rule
  (targets bindings.ml)
