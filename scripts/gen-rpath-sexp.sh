@@ -1,6 +1,21 @@
 #!/usr/bin/env sh
-# Single linker flag as a dune string (for use with (:include ...) in c_library_flags).
+set -eu
+
+# Linker flags as a dune list (for use with (:include ...) in c_library_flags).
+flags=
+
 case "$(uname -s)" in
-Darwin*) printf '%s\n' '"-Wl,-rpath,@loader_path"' ;;
-*) printf '%s\n' '"-Wl,-rpath,$ORIGIN"' ;;
+Darwin*) flags='"-Wl,-rpath,@loader_path"' ;;
+*) flags='"-Wl,-rpath,$ORIGIN"' ;;
 esac
+
+if test -n "${OPAM_SWITCH_PREFIX:-}"; then
+  flags="$flags \"-L$OPAM_SWITCH_PREFIX/lib/stublibs\""
+elif command -v opam >/dev/null 2>&1; then
+  stublibs="$(opam var stublibs 2>/dev/null || true)"
+  if test -n "$stublibs"; then
+    flags="$flags \"-L$stublibs\""
+  fi
+fi
+
+printf '(%s)\n' "$flags"
