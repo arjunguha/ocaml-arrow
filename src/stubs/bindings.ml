@@ -91,6 +91,16 @@ module C (F : Cstubs.FOREIGN) = struct
     let add_all_columns = foreign "table_add_all_columns" (t @-> t @-> returning t)
   end
 
+  module Parquet_writer = struct
+    type t = unit ptr
+
+    let t : t typ = ptr void
+    let open_ = foreign "parquet_writer_open" (string @-> int @-> returning t)
+    let write_table = foreign "parquet_writer_write_table" (t @-> Table.t @-> returning void)
+    let close = foreign "parquet_writer_close" (t @-> returning void)
+    let free = foreign "parquet_writer_free" (t @-> returning void)
+  end
+
   module Parquet_reader = struct
     type t = unit ptr
 

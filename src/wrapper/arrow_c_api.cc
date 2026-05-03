@@ -484,6 +484,71 @@ void parquet_write_table(char *filename, TablePtr *table, int chunk_size, int co
   OCAML_END_PROTECT_EXN
 }
 
+struct ParquetWriter {
+  std::shared_ptr<arrow::io::FileOutputStream> outfile;
+  std::unique_ptr<parquet::arrow::FileWriter> writer;
+  int compression;
+  bool opened;
+  bool closed;
+};
+
+ParquetWriter *parquet_writer_open(char *filename, int compression) {
+  OCAML_BEGIN_PROTECT_EXN_RELEASE_LOCK
+
+  auto file = arrow::io::FileOutputStream::Open(filename);
+  return new ParquetWriter{ok_exn(file), nullptr, compression, false, false};
+
+  OCAML_END_PROTECT_EXN
+  return nullptr;
+}
+
+void parquet_writer_write_table(ParquetWriter *writer, TablePtr *table) {
+  OCAML_BEGIN_PROTECT_EXN_RELEASE_LOCK
+
+  if (writer->closed) {
+    throw std::invalid_argument("cannot write to a closed parquet row group writer");
+  }
+  if (!writer->opened) {
+    arrow::Compression::type compression_ = compression_of_int(writer->compression);
+    std::shared_ptr<parquet::WriterProperties> writer_properties =
+      parquet::WriterProperties::Builder()
+        .version(parquet::ParquetVersion::PARQUET_2_0)
+        ->compression(compression_)
+        ->build();
+    arrow::Status open_status = parquet::arrow::FileWriter::Open(
+        *((*table)->schema()),
+        arrow::default_memory_pool(),
+        writer->outfile,
+        writer_properties,
+        &(writer->writer));
+    status_exn(open_status);
+    writer->opened = true;
+  }
+  int64_t nrows = (*table)->num_rows();
+  arrow::Status st = writer->writer->WriteTable(**table, nrows);
+  status_exn(st);
+
+  OCAML_END_PROTECT_EXN
+}
+
+void parquet_writer_close(ParquetWriter *writer) {
+  OCAML_BEGIN_PROTECT_EXN_RELEASE_LOCK
+
+  if (!writer->closed) {
+    if (writer->opened) {
+      arrow::Status st = writer->writer->Close();
+      status_exn(st);
+    }
+    writer->closed = true;
+  }
+
+  OCAML_END_PROTECT_EXN
+}
+
+void parquet_writer_free(ParquetWriter *writer) {
+  delete writer;
+}
+
 void feather_write_table(char *filename, TablePtr *table, int chunk_size, int compression) {
   OCAML_BEGIN_PROTECT_EXN_RELEASE_LOCK
 

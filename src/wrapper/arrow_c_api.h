@@ -30,10 +30,13 @@ struct ParquetReader {
   std::unique_ptr<arrow::RecordBatchReader> batch_reader;
 };
 
+struct ParquetWriter;
+
 extern "C" {
 #else
 typedef void TablePtr;
 typedef void ParquetReader;
+typedef void ParquetWriter;
 typedef void BuilderPtr;
 typedef void StringBuilderPtr;
 typedef void Int32BuilderPtr;
@@ -77,6 +80,11 @@ void parquet_write_file(char *filename, struct ArrowArray *, struct ArrowSchema 
 void feather_write_file(char *filename, struct ArrowArray *, struct ArrowSchema *, int chunk_size, int compression);
 void parquet_write_table(char *filename, TablePtr *table, int chunk_size, int compression);
 void feather_write_table(char *filename, TablePtr *table, int chunk_size, int compression);
+
+ParquetWriter *parquet_writer_open(char *filename, int compression);
+void parquet_writer_write_table(ParquetWriter *writer, TablePtr *table);
+void parquet_writer_close(ParquetWriter *writer);
+void parquet_writer_free(ParquetWriter *writer);
 
 ParquetReader *parquet_reader_open(char *filename, int *col_idxs, int ncols, int use_threads, int mmap, int buffer_size, int batch_size);
 TablePtr *parquet_reader_next(ParquetReader *pr);

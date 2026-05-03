@@ -268,12 +268,24 @@ module Writer : sig
   val bitset : Valid.t -> name:string -> col
   val bitset_opt : Valid.t -> valid:Valid.t -> name:string -> col
 
+  module Row_group_writer : sig
+    type t
+
+    val write_exn : t -> cols:col list -> unit
+  end
+
   val write
     :  ?chunk_size:int
     -> ?compression:Compression.t
     -> string
     -> cols:col list
     -> unit
+
+  val with_row_group_writer
+    :  ?compression:Compression.t
+    -> string
+    -> f:(Row_group_writer.t -> 'a)
+    -> 'a
 
   val create_table : cols:col list -> Table.t
 end

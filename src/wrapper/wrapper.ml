@@ -896,6 +896,14 @@ module Writer = struct
 
   type col = C.ArrowArray.t * C.ArrowSchema.t
 
+  let col_length (array, _) =
+    Ctypes.getf array C.ArrowArray.length |> Int64.to_int_exn
+
+  let col_schema_signature (_, schema) =
+    ( Ctypes.getf schema C.ArrowSchema.name |> get_string
+    , Ctypes.getf schema C.ArrowSchema.format |> get_string
+    , Ctypes.getf schema C.ArrowSchema.flags )
+
   let schema_struct ~format ~name ~children ~flag =
     let format = Ctypes.CArray.of_string format in
     let name = Ctypes.CArray.of_string name in
@@ -1492,8 +1500,7 @@ module Writer = struct
         array
         ~name
 
-  let write ?(chunk_size = 1024 * 1024) ?(compression = Compression.Snappy) filename ~cols
-    =
+  let table_of_cols ~cols =
     let children_arrays, children_schemas = List.unzip cols in
     let num_rows =
       match children_arrays with
@@ -1523,6 +1530,78 @@ module Writer = struct
         ~children:children_schemas
         ~flag:Schema.Flags.none
     in
+    array_struct, schema_struct, num_rows
+
+  let validate_row_group_cols ~caller ~cols =
+    match cols with
+    | [] -> invalid_arg (caller ^ ": row group has no columns")
+    | col :: cols ->
+      let num_rows = col_length col in
+      List.iter cols ~f:(fun col ->
+          let length = col_length col in
+          if length <> num_rows
+          then
+            invalid_arg
+              (Printf.sprintf
+                 "%s: columns have different lengths (%d and %d)"
+                 caller
+                 num_rows
+                 length));
+      num_rows
+
+  module Row_group_writer = struct
+    type t =
+      { writer : C.Parquet_writer.t
+      ; mutable closed : bool
+      ; mutable schema : (string * string * int64) list
+      }
+
+    let write_exn t ~cols =
+      if t.closed
+      then invalid_arg "Writer.Row_group_writer.write_exn: writer is closed";
+      ignore (validate_row_group_cols ~caller:"Writer.Row_group_writer.write_exn" ~cols);
+      let schema = List.map cols ~f:col_schema_signature in
+      (match t.schema with
+       | [] -> t.schema <- schema
+       | existing ->
+         if not (Poly.equal existing schema)
+         then invalid_arg "Writer.Row_group_writer.write_exn: row group schema changed");
+      let array_struct, schema_struct, _ = table_of_cols ~cols in
+      if add_compact then Stdlib.Gc.compact ();
+      let table =
+        C.Table.create (Ctypes.addr array_struct) (Ctypes.addr schema_struct)
+        |> Table.with_free
+      in
+      C.Parquet_writer.write_table t.writer table;
+      use_value cols;
+      Stdlib.Gc.finalise (fun _ -> use_value cols) table
+
+    let close t =
+      if not t.closed
+      then (
+        C.Parquet_writer.close t.writer;
+        t.closed <- true)
+  end
+
+  let with_row_group_writer ?(compression = Compression.Snappy) filename ~f =
+    let writer =
+      { Row_group_writer.writer =
+          C.Parquet_writer.open_ filename (Compression.to_cint compression)
+      ; closed = false
+      ; schema = []
+      }
+    in
+    Stdlib.Gc.finalise C.Parquet_writer.free writer.writer;
+    let result =
+      Exn.protect ~f:(fun () -> f writer) ~finally:(fun () -> Row_group_writer.close writer)
+    in
+    if List.is_empty writer.schema
+    then invalid_arg "Writer.with_row_group_writer: no row groups were written";
+    result
+
+  let write ?(chunk_size = 1024 * 1024) ?(compression = Compression.Snappy) filename ~cols
+    =
+    let array_struct, schema_struct, _ = table_of_cols ~cols in
     if add_compact then Stdlib.Gc.compact ();
     let write_fn =
       if String.is_suffix filename ~suffix:".feather"
@@ -1540,35 +1619,7 @@ module Writer = struct
     use_value cols
 
   let create_table ~cols =
-    let children_arrays, children_schemas = List.unzip cols in
-    let num_rows =
-      match children_arrays with
-      | [] -> 0
-      | array :: _ -> Ctypes.getf array C.ArrowArray.length |> Int64.to_int_exn
-    in
-    let children_arrays =
-      List.map children_arrays ~f:Ctypes.addr
-      |> Ctypes.CArray.of_list (Ctypes.ptr C.ArrowArray.t)
-    in
-    let children_schemas =
-      List.map children_schemas ~f:Ctypes.addr
-      |> Ctypes.CArray.of_list (Ctypes.ptr C.ArrowSchema.t)
-    in
-    let array_struct =
-      array_struct
-        ~finalise:ignore
-        ~length:num_rows
-        ~null_count:0
-        ~buffers:single_null_buffer
-        ~children:children_arrays
-    in
-    let schema_struct =
-      schema_struct
-        ~format:"+s"
-        ~name:""
-        ~children:children_schemas
-        ~flag:Schema.Flags.none
-    in
+    let array_struct, schema_struct, _ = table_of_cols ~cols in
     if add_compact then Stdlib.Gc.compact ();
     let table =
       C.Table.create (Ctypes.addr array_struct) (Ctypes.addr schema_struct)
