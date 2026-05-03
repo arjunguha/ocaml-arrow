@@ -61,7 +61,7 @@ let%expect_test _ =
     List.gen_with_length length gen
   in
   Quickcheck.iter ~trials:10 ~seed:(`Deterministic "fortytwo") gen ~f:(fun ts ->
-      let filename = Caml.Filename.temp_file "test" ".parquet" in
+      let filename = Stdlib.Filename.temp_file "test" ".parquet" in
       Exn.protect
         ~f:(fun () ->
           let hd = List.hd_exn ts in
@@ -108,7 +108,7 @@ let%expect_test _ =
                   (sexp_of_t t |> Sexp.to_string_mach)
                   (sexp_of_t t' |> Sexp.to_string_mach)));
           Stdio.printf "\n")
-        ~finally:(fun () -> Caml.Sys.remove filename));
+        ~finally:(fun () -> Stdlib.Sys.remove filename));
   [%expect
     {|
     z: foo-55932
@@ -227,7 +227,7 @@ let sexp_of_time_ns time_ns =
 let sexp_of_ofday_ns ofday = Time_ns.Ofday.to_string ofday |> sexp_of_string
 
 let%expect_test _ =
-  let filename = Caml.Filename.temp_file "test" ".parquet" in
+  let filename = Stdlib.Filename.temp_file "test" ".parquet" in
   Exn.protect
     ~f:(fun () ->
       let col_v1 = Writer.float [| 1.; 2.; 3.; 3.14159265358979; 5. |] ~name:"x" in
@@ -269,7 +269,7 @@ let%expect_test _ =
         ([%sexp_of: time_ns array] col_time |> Sexp.to_string_mach)
         ([%sexp_of: ofday_ns array] col_ofday |> Sexp.to_string_mach);
       ())
-    ~finally:(fun () -> Caml.Sys.remove filename);
+    ~finally:(fun () -> Stdlib.Sys.remove filename);
   [%expect
     {|
     5

@@ -71,4 +71,4 @@ let%expect_test _ =
   let table = Ppx_t.arrow_table_of_t2 ts in
   let table = Arrow_c_api.Table.concatenate [ table; table; table ] in
   let ts2 = Ppx_t.arrow_t2_of_table table in
-  assert (Caml.( = ) (Array.concat [ ts; ts; ts ]) ts2)
+  assert (Stdlib.( = ) (Array.concat [ ts; ts; ts ]) ts2)

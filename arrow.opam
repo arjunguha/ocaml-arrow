@@ -1,19 +1,29 @@
 opam-version: "2.0"
 name:         "arrow"
+license:      "Apache-2.0"
 bug-reports:  "https://github.com/LaurentMazare/ocaml-arrow/issues"
 homepage:     "https://github.com/LaurentMazare/ocaml-arrow"
 dev-repo:     "git+https://github.com/LaurentMazare/ocaml-arrow.git"
 maintainer:   "Laurent Mazare <lmazare@gmail.com>"
 authors:      [ "Laurent Mazare" ]
 
-build: [["dune" "build" "-p" name "-j" jobs]]
-run-test: [["dune" "runtest" "-p" name "-j" jobs]]
+build: [
+  ["sh" "-exc" "if test -f .gitmodules; then git submodule update --init --recursive; fi"]
+  ["sh" "-exc" "ARROW_BUILD_JOBS=%{jobs}% ./scripts/build-vendored-arrow.sh"]
+  ["dune" "build" "-p" name "-j" jobs]
+]
+run-test: [
+  ["env"
+   "LD_LIBRARY_PATH=%{build}%/vendor/arrow-install/lib"
+   "dune" "runtest" "-p" name "-j" jobs]
+]
 
 depends: [
   "base" {>= "0.12.0"}
   "ctypes" {>= "0.5"}
   "ctypes-foreign"
-  "dune" {>= "1.3.0" build}
+  "conf-cmake" {build}
+  "dune" {>= "3.11" & build}
   "ocaml" {>= "4.06"}
   "ocaml-compiler-libs"
   "ppx_custom_printf"
@@ -25,12 +35,14 @@ depends: [
   "core_kernel"
   "pyml" {with-test}
 ]
-depexts: [
-  ["apache-arrow"] {os = "macos" & os-distribution = "homebrew"}
-  ["libarrow-dev"] {os-family = "debian"}
-]
-available: [ os = "linux" | "macos" ]
-synopsis: "Arrow bindings for OCaml"
+available: [ os = "linux" | os = "macos" ]
+synopsis: "Apache Arrow bindings for OCaml"
 description: """
-Bindings for Apache Arrow.
+OCaml bindings for Apache Arrow (C++ API). The Apache Arrow C++ implementation is
+vendored as a git submodule under vendor/apache-arrow (pinned to the
+apache-arrow-5.0.0 tag), built locally into vendor/arrow-install, and
+libarrow/libparquet shared libraries are installed alongside OCaml stublibs when
+you install this package.
+
+Libraries: arrow.c_api, arrow.ppx, and arrow.ppx_runtime.
 """

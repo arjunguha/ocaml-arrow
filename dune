@@ -1,0 +1,6 @@
+(subdir vendor
+ (dirs arrow-install))
+
+(env
+ (_
+  (flags (:standard -alert -deprecated))))

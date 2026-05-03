@@ -77,7 +77,7 @@ let generate_ts ~cnt =
   List.init cnt ~f:(fun cnt -> ts ~cnt) |> List.concat
 
 let run ?chunk_size ?compression cnt =
-  let filename = Caml.Filename.temp_file "test" ".parquet" in
+  let filename = Stdlib.Filename.temp_file "test" ".parquet" in
   Exn.protect
     ~f:(fun () ->
       let ts = generate_ts ~cnt in
@@ -92,7 +92,7 @@ let run ?chunk_size ?compression cnt =
               "in:  %s\nout: %s\n\n%!"
               (sexp_of_t t |> Sexp.to_string_mach)
               (sexp_of_t t' |> Sexp.to_string_mach))))
-    ~finally:(fun () -> Caml.Sys.remove filename)
+    ~finally:(fun () -> Stdlib.Sys.remove filename)
 
 let%expect_test _ =
   run 0;

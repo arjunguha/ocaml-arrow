@@ -30,7 +30,7 @@ let python_read_and_rewrite ~filename =
 
 let%expect_test _ =
   let test len ~chunk_size =
-    let filename = Caml.Filename.temp_file "test" ".parquet" in
+    let filename = Stdlib.Filename.temp_file "test" ".parquet" in
     Exn.protect
       ~f:(fun () ->
         let bitsets =
@@ -60,7 +60,7 @@ let%expect_test _ =
             if String.( <> ) bitset bitset' then Stdio.printf "%s\n%s\n\n" bitset bitset';
             if String.( <> ) bitset py_bitset
             then Stdio.printf "ml: %s\npy: %s\n\n" bitset py_bitset))
-      ~finally:(fun () -> Caml.Sys.remove filename)
+      ~finally:(fun () -> Stdlib.Sys.remove filename)
   in
   List.iter
     ~f:(fun (len, chunk_size) -> test len ~chunk_size)
@@ -69,7 +69,7 @@ let%expect_test _ =
 
 let%expect_test _ =
   let test len ~chunk_size =
-    let filename = Caml.Filename.temp_file "test" ".parquet" in
+    let filename = Stdlib.Filename.temp_file "test" ".parquet" in
     Exn.protect
       ~f:(fun () ->
         let bitset_and_valids =
@@ -102,7 +102,7 @@ let%expect_test _ =
             if String.( <> ) bitset bitset' then Stdio.printf "%s\n%s\n\n" bitset bitset';
             if String.( <> ) bitset py_bitset
             then Stdio.printf "ml: %s\npy: %s\n\n" bitset py_bitset))
-      ~finally:(fun () -> Caml.Sys.remove filename)
+      ~finally:(fun () -> Stdlib.Sys.remove filename)
   in
   List.iter
     ~f:(fun (len, chunk_size) -> test len ~chunk_size)

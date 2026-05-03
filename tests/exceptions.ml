@@ -14,11 +14,11 @@ let%expect_test _ =
       "IOError: Failed to open local file 'does-not-exist.parquet'. Detail: [errno 2] No such file or directory") |}]
 
 let%expect_test _ =
-  let filename = Caml.Filename.temp_file "test" ".parquet" in
+  let filename = Stdlib.Filename.temp_file "test" ".parquet" in
   Exn.protect
     ~f:(fun () ->
       catch_and_print (fun () -> ignore (Parquet_reader.table filename : Table.t)))
-    ~finally:(fun () -> Caml.Sys.remove filename);
+    ~finally:(fun () -> Stdlib.Sys.remove filename);
   [%expect {|
     (Failure "Invalid: Parquet file size is 0 bytes") |}]
 

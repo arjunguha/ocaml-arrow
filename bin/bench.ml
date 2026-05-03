@@ -41,9 +41,9 @@ let col_readers table =
 
 let () =
   let filename =
-    match Caml.Sys.argv with
+    match Stdlib.Sys.argv with
     | [| _exe; filename |] -> filename
-    | _ -> Printf.failwithf "usage: %s file.parquet" Caml.Sys.argv.(0) ()
+    | _ -> Printf.failwithf "usage: %s file.parquet" Stdlib.Sys.argv.(0) ()
   in
   let prev_time = ref (Time_ns.now ()) in
   A.Parquet_reader.iter_batches filename ~batch_size:8192 ~f:(fun table ->

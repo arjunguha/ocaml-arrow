@@ -11,7 +11,7 @@ let create_t index =
   }
 
 let%expect_test _ =
-  let filename = Caml.Filename.temp_file "test" ".parquet" in
+  let filename = Stdlib.Filename.temp_file "test" ".parquet" in
   Exn.protect
     ~f:(fun () ->
       let ts = Array.init 100_000 ~f:create_t in
@@ -31,7 +31,7 @@ let%expect_test _ =
           loop_read ()
       in
       loop_read ())
-    ~finally:(fun () -> Caml.Sys.remove filename);
+    ~finally:(fun () -> Stdlib.Sys.remove filename);
   [%expect
     {|
     file has 100000 rows

@@ -1,19 +1,48 @@
+(rule
+ (targets rpath_flags.sexp)
+ (deps ../../scripts/gen-rpath-sexp.sh)
+ (action
+  (with-stdout-to %{targets}
+   (run sh %{deps}))))
+
 (library
-  (name arrow_c_api)
-  (public_name arrow.c_api)
-  (foreign_stubs (language c) (names arrow_c_api_stubs))
-  (foreign_stubs (language cxx) (names arrow_c_api) (flags -fPIC -std=c++14))
-  (c_library_flags :standard -larrow -lparquet -lstdc++)
-  (libraries base bigarray core_kernel ctypes ctypes.foreign ctypes.stubs stdio)
-  (inline_tests)
-  (preprocess (pps ppx_expect ppx_sexp_conv)))
+ (name arrow_c_api)
+ (public_name arrow.c_api)
+ (foreign_stubs
+  (language c)
+  (names arrow_c_api_stubs)
+  (include_dirs %{project_root}/vendor/arrow-install/include))
+ (foreign_stubs
+  (language cxx)
+  (names arrow_c_api)
+  (flags :standard -fPIC -std=c++17)
+  (include_dirs %{project_root}/vendor/arrow-install/include))
+ (c_library_flags
+  :standard
+  (:include rpath_flags.sexp)
+  -L%{project_root}/vendor/arrow-install/lib
+  -lparquet
+  -larrow
+  -lstdc++)
+ (libraries base bigarray core_kernel ctypes ctypes.foreign ctypes.stubs stdio)
+ (inline_tests)
+ (preprocess (pps ppx_expect ppx_sexp_conv)))
+
+(install
+ (package arrow)
+ (section stublibs)
+ (files
+  (glob_files
+   (../../vendor/arrow-install/lib/libarrow* with_prefix .))
+  (glob_files
+   (../../vendor/arrow-install/lib/libparquet* with_prefix .))))
 
 (rule
-  (targets bindings.ml)
-  (deps    ../stubs/bindings.ml)
-  (action  (copy ../stubs/bindings.ml bindings.ml)))
+ (targets bindings.ml)
+ (deps ../stubs/bindings.ml)
+ (action (copy ../stubs/bindings.ml bindings.ml)))
 
 (rule
-  (targets arrow_c_api_stubs.c bindings_generated.ml)
-  (deps    (:gen ../stubs/gen.exe))
-  (action  (run %{gen})))
+ (targets arrow_c_api_stubs.c bindings_generated.ml)
+ (deps (:gen ../stubs/gen.exe))
+ (action (run %{gen})))

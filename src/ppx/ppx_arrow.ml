@@ -2,7 +2,12 @@ open Base
 open Ppxlib
 open Ast_builder.Default
 
-let raise_errorf ~loc fmt = Location.raise_errorf ~loc (Caml.( ^^ ) "ppx_arrow: " fmt)
+let raise_errorf ~loc fmt =
+  let fmt =
+    let open! Stdlib.Format in
+    "ppx_arrow: " ^^ fmt
+  in
+  Location.raise_errorf ~loc fmt
 
 let floatable =
   Attribute.declare
@@ -275,7 +280,7 @@ end = struct
       | `of_table -> args
     in
     [%expr
-      Caml.Array.init (Arrow_c_api.Table.num_rows table) (fun idx ->
+      Stdlib.Array.init (Arrow_c_api.Table.num_rows table) (fun idx ->
           [%e pexp_record record_fields ~loc None])]
     |> pexp_let ~loc Nonrecursive create_columns
     |> pexp_let
@@ -352,7 +357,7 @@ end = struct
            [ value_binding
                ~loc
                ~pat:(pat "__arrow_len")
-               ~expr:[%expr Caml.Array.length [%e args]]
+               ~expr:[%expr Stdlib.Array.length [%e args]]
            ]
       |> open_runtime ~loc
     | `write ->
@@ -369,7 +374,7 @@ end = struct
                [ value_binding
                    ~loc
                    ~pat:(pat "__arrow_len")
-                   ~expr:[%expr Caml.Array.length [%e args]]
+                   ~expr:[%expr Stdlib.Array.length [%e args]]
                ]
           |> open_runtime ~loc)
 

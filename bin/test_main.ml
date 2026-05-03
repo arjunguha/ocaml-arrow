@@ -84,9 +84,9 @@ let () =
 
 let () =
   let filename =
-    match Caml.Sys.argv with
+    match Stdlib.Sys.argv with
     | [| _exe; filename |] -> filename
-    | _ -> Printf.failwithf "usage: %s file.parquet" Caml.Sys.argv.(0) ()
+    | _ -> Printf.failwithf "usage: %s file.parquet" Stdlib.Sys.argv.(0) ()
   in
   let schema = Parquet_reader.schema filename in
   Schema.sexp_of_t schema |> Sexp.to_string_hum |> Stdio.printf "Read schema:\n%s\n%!";

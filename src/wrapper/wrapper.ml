@@ -19,7 +19,7 @@ let ptr_of_strings strings =
   let open Ctypes in
   let strings = List.map ~f:ptr_of_string strings in
   let start = CArray.(of_list (ptr char) strings |> start) in
-  Caml.Gc.finalise (fun _ -> use_value strings) start;
+  Stdlib.Gc.finalise (fun _ -> use_value strings) start;
   start
 
 let get_string ptr_char =
@@ -106,7 +106,7 @@ module Schema = struct
       loop Ctypes.(p +@ 4) [] nfields)
 
   let of_c c_schema =
-    Caml.Gc.finalise C.ArrowSchema.free c_schema;
+    Stdlib.Gc.finalise C.ArrowSchema.free c_schema;
     let rec loop c_schema =
       if Ctypes.is_null c_schema then failwith "Got a null schema";
       let schema = Ctypes.( !@ ) c_schema in
@@ -128,7 +128,7 @@ module ChunkedArray = struct
   type t = C.ChunkedArray.t
 
   let with_free t =
-    Caml.Gc.finalise C.ChunkedArray.free t;
+    Stdlib.Gc.finalise C.ChunkedArray.free t;
     t
 end
 
@@ -140,7 +140,7 @@ module Table = struct
   let to_string_debug = C.Table.to_string
 
   let with_free t =
-    Caml.Gc.finalise C.Table.free t;
+    Stdlib.Gc.finalise C.Table.free t;
     t
 
   let concatenate ts =
@@ -207,7 +207,7 @@ module Parquet_reader = struct
         buffer_size
         batch_size
     in
-    Caml.Gc.finalise C.Parquet_reader.free t;
+    Stdlib.Gc.finalise C.Parquet_reader.free t;
     t
 
   let next t =
@@ -1399,7 +1399,7 @@ module Writer = struct
         ~children:children_schemas
         ~flag:Schema.Flags.none
     in
-    if add_compact then Caml.Gc.compact ();
+    if add_compact then Stdlib.Gc.compact ();
     let write_fn =
       if String.is_suffix filename ~suffix:".feather"
       then C.feather_write_file
@@ -1445,13 +1445,13 @@ module Writer = struct
         ~children:children_schemas
         ~flag:Schema.Flags.none
     in
-    if add_compact then Caml.Gc.compact ();
+    if add_compact then Stdlib.Gc.compact ();
     let table =
       C.Table.create (Ctypes.addr array_struct) (Ctypes.addr schema_struct)
       |> Table.with_free
     in
     use_value cols;
-    Caml.Gc.finalise (fun _ -> use_value cols) table;
+    Stdlib.Gc.finalise (fun _ -> use_value cols) table;
     table
 
   let int array ~name =
@@ -1490,7 +1490,7 @@ module DoubleBuilder = struct
 
   let create () =
     let t = C.DoubleBuilder.create () in
-    Caml.Gc.finalise C.DoubleBuilder.free t;
+    Stdlib.Gc.finalise C.DoubleBuilder.free t;
     t
 
   let append_null ?(n = 1) t = C.DoubleBuilder.append_null t n
@@ -1504,7 +1504,7 @@ module Int32Builder = struct
 
   let create () =
     let t = C.Int32Builder.create () in
-    Caml.Gc.finalise C.Int32Builder.free t;
+    Stdlib.Gc.finalise C.Int32Builder.free t;
     t
 
   let append_null ?(n = 1) t = C.Int32Builder.append_null t n
@@ -1518,7 +1518,7 @@ module Int64Builder = struct
 
   let create () =
     let t = C.Int64Builder.create () in
-    Caml.Gc.finalise C.Int64Builder.free t;
+    Stdlib.Gc.finalise C.Int64Builder.free t;
     t
 
   let append_null ?(n = 1) t = C.Int64Builder.append_null t n
@@ -1532,7 +1532,7 @@ module StringBuilder = struct
 
   let create () =
     let t = C.StringBuilder.create () in
-    Caml.Gc.finalise C.StringBuilder.free t;
+    Stdlib.Gc.finalise C.StringBuilder.free t;
     t
 
   let append_null ?(n = 1) t = C.StringBuilder.append_null t n
