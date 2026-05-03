@@ -72,3 +72,14 @@ let%expect_test _ =
   let table = Arrow_c_api.Table.concatenate [ table; table; table ] in
   let ts2 = Ppx_t.arrow_t2_of_table table in
   assert (Stdlib.( = ) (Array.concat [ ts; ts; ts ]) ts2)
+
+let%expect_test "binary columns preserve arbitrary bytes" =
+  let rows =
+    [| { Ppx_t.key = "k1"; payload = "a\000b\xff"; payload_opt = Some "x" }
+     ; { Ppx_t.key = "k2"; payload = ""; payload_opt = None }
+    |]
+  in
+  let table = Ppx_t.arrow_table_of_t_bin rows in
+  let rows' = Ppx_t.arrow_t_bin_of_table table in
+  assert (Stdlib.( = ) rows rows');
+  [%expect {| |}]

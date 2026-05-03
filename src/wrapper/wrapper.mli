@@ -104,6 +104,7 @@ module Column : sig
   val read_int32 : Table.t -> column:column -> Int32.t array
   val read_float : Table.t -> column:column -> float array
   val read_utf8 : Table.t -> column:column -> string array
+  val read_binary : Table.t -> column:column -> string array
   val read_date : Table.t -> column:column -> Core_kernel.Date.t array
   val read_time_ns : Table.t -> column:column -> Core_kernel.Time_ns.t array
   val read_ofday_ns : Table.t -> column:column -> Core_kernel.Time_ns.Ofday.t array
@@ -135,6 +136,7 @@ module Column : sig
   val read_int32_opt : Table.t -> column:column -> Int32.t option array
   val read_float_opt : Table.t -> column:column -> float option array
   val read_utf8_opt : Table.t -> column:column -> string option array
+  val read_binary_opt : Table.t -> column:column -> string option array
   val read_date_opt : Table.t -> column:column -> Core_kernel.Date.t option array
   val read_time_ns_opt : Table.t -> column:column -> Core_kernel.Time_ns.t option array
 
@@ -250,6 +252,8 @@ module Writer : sig
   val float_opt : float option array -> name:string -> col
   val utf8 : string array -> name:string -> col
   val utf8_opt : string option array -> name:string -> col
+  val binary : string array -> name:string -> col
+  val binary_opt : string option array -> name:string -> col
   val date : Core_kernel.Date.t array -> name:string -> col
   val date_opt : Core_kernel.Date.t option array -> name:string -> col
 

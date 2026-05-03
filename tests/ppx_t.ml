@@ -20,3 +20,14 @@ type t2 =
   ; o_opt : Time_ns.Ofday.t option
   }
 [@@deriving arrow]
+
+module Binary = struct
+  type t = string
+end
+
+type t_bin =
+  { key : string
+  ; payload : Binary.t
+  ; payload_opt : Binary.t option
+  }
+[@@deriving arrow, sexp_of]

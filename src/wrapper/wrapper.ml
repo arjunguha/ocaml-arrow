@@ -360,6 +360,7 @@ module Column = struct
       | Int64
       | Float64
       | Utf8
+      | Binary
       | Date32
       | Timestamp
       | Bool
@@ -372,6 +373,7 @@ module Column = struct
       | Int64 -> 0
       | Float64 -> 1
       | Utf8 -> 2
+      | Binary -> 10
       | Date32 -> 3
       | Timestamp -> 4
       | Bool -> 5
@@ -716,6 +718,86 @@ module Column = struct
                     in
                     valid, Ctypes.from_voidp Ctypes.char data
                   | _ -> failwith "expected 3 columns for utf8"
+                in
+                for idx = 0 to chunk.length - 1 do
+                  let is_valid =
+                    if chunk.null_count = 0
+                    then true
+                    else (
+                      match valid with
+                      | None -> true
+                      | Some valid ->
+                        let b =
+                          Ctypes.(!@(valid +@ (idx / 8))) |> Unsigned.UInt8.to_int
+                        in
+                        b land (1 lsl (idx land 0b111)) <> 0)
+                  in
+                  if is_valid
+                  then (
+                    let str_offset = Ctypes.(!@(offsets +@ idx)) |> Int32.to_int_exn in
+                    let next_str_offset =
+                      Ctypes.(!@(offsets +@ (idx + 1))) |> Int32.to_int_exn
+                    in
+                    let str =
+                      Ctypes.string_from_ptr
+                        Ctypes.(data +@ str_offset)
+                        ~length:(next_str_offset - str_offset)
+                    in
+                    dst.(dst_offset + idx) <- Some str)
+                done);
+              dst_offset + chunk.length)
+        in
+        dst)
+
+  let read_binary table ~column =
+    with_column table Binary ~column ~f:(fun chunks ->
+        let num_rows = num_rows chunks in
+        let dst = Array.create "" ~len:num_rows in
+        let _num_rows =
+          List.fold chunks ~init:0 ~f:(fun dst_offset chunk ->
+              let chunk = Chunk.create chunk ~fail_on_null:true ~fail_on_offset:false in
+              let offsets = Chunk.primitive_data_ptr chunk ~ctype:Ctypes.int32_t in
+              let data =
+                match chunk.buffers with
+                | [ _; _; data ] -> Ctypes.from_voidp Ctypes.char data
+                | _ -> failwith "expected 3 buffers for binary"
+              in
+              for idx = 0 to chunk.length - 1 do
+                let str_offset = Ctypes.(!@(offsets +@ idx)) |> Int32.to_int_exn in
+                let next_str_offset =
+                  Ctypes.(!@(offsets +@ (idx + 1))) |> Int32.to_int_exn
+                in
+                let str =
+                  Ctypes.string_from_ptr
+                    Ctypes.(data +@ str_offset)
+                    ~length:(next_str_offset - str_offset)
+                in
+                dst.(dst_offset + idx) <- str
+              done;
+              dst_offset + chunk.length)
+        in
+        dst)
+
+  let read_binary_opt table ~column =
+    with_column table Binary ~column ~f:(fun chunks ->
+        let num_rows = num_rows chunks in
+        let dst = Array.create None ~len:num_rows in
+        let _num_rows =
+          List.fold chunks ~init:0 ~f:(fun dst_offset chunk ->
+              let chunk = Chunk.create chunk ~fail_on_null:false ~fail_on_offset:true in
+              if chunk.null_count <> chunk.length
+              then (
+                let offsets = Chunk.primitive_data_ptr chunk ~ctype:Ctypes.int32_t in
+                let valid, data =
+                  match chunk.buffers with
+                  | [ valid; _; data ] ->
+                    let valid =
+                      if Ctypes.is_null valid
+                      then None
+                      else Some Ctypes.(from_voidp uint8_t valid)
+                    in
+                    valid, Ctypes.from_voidp Ctypes.char data
+                  | _ -> failwith "expected 3 buffers for binary"
                 in
                 for idx = 0 to chunk.length - 1 do
                   let is_valid =
@@ -1271,7 +1353,7 @@ module Writer = struct
     (array_struct, schema_struct : col)
   ;;
 
-  let utf8
+  let vl_utf8
       (type a)
       (kind : (a, _) Bigarray.kind)
       ~format
@@ -1301,7 +1383,7 @@ module Writer = struct
     let sum_length = Array.sum (module Int) array ~f:String.length in
     if sum_length + 10 < 1 lsl 31
     then
-      utf8
+      vl_utf8
         Int32
         ~of_int_exn:Int32.of_int_exn
         ~to_int_exn:Int32.to_int_exn
@@ -1309,7 +1391,7 @@ module Writer = struct
         array
         ~name
     else
-      utf8
+      vl_utf8
         Int64
         ~of_int_exn:Int64.of_int_exn
         ~to_int_exn:Int64.to_int_exn
@@ -1317,7 +1399,7 @@ module Writer = struct
         array
         ~name
 
-  let utf8_opt
+  let vl_utf8_opt
       (type a)
       (kind : (a, _) Bigarray.kind)
       ~format
@@ -1352,7 +1434,7 @@ module Writer = struct
     in
     if sum_length + 10 < 1 lsl 31
     then
-      utf8_opt
+      vl_utf8_opt
         Int32
         ~of_int_exn:Int32.of_int_exn
         ~to_int_exn:Int32.to_int_exn
@@ -1360,11 +1442,53 @@ module Writer = struct
         array
         ~name
     else
-      utf8_opt
+      vl_utf8_opt
         Int64
         ~of_int_exn:Int64.of_int_exn
         ~to_int_exn:Int64.to_int_exn
         ~format:"U"
+        array
+        ~name
+
+  let binary array ~name =
+    let sum_length = Array.sum (module Int) array ~f:String.length in
+    if sum_length + 10 < 1 lsl 31
+    then
+      vl_utf8
+        Int32
+        ~of_int_exn:Int32.of_int_exn
+        ~to_int_exn:Int32.to_int_exn
+        ~format:"z"
+        array
+        ~name
+    else
+      vl_utf8
+        Int64
+        ~of_int_exn:Int64.of_int_exn
+        ~to_int_exn:Int64.to_int_exn
+        ~format:"Z"
+        array
+        ~name
+
+  let binary_opt array ~name =
+    let sum_length =
+      Array.sum (module Int) array ~f:(Option.value_map ~default:0 ~f:String.length)
+    in
+    if sum_length + 10 < 1 lsl 31
+    then
+      vl_utf8_opt
+        Int32
+        ~of_int_exn:Int32.of_int_exn
+        ~to_int_exn:Int32.to_int_exn
+        ~format:"z"
+        array
+        ~name
+    else
+      vl_utf8_opt
+        Int64
+        ~of_int_exn:Int64.of_int_exn
+        ~to_int_exn:Int64.to_int_exn
+        ~format:"Z"
         array
         ~name
 

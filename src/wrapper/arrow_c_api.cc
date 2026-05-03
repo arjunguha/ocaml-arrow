@@ -280,6 +280,10 @@ struct ArrowArray *table_chunked_column_(TablePtr *table, char *column_name, int
     expected_type = arrow::Type::DURATION;
     expected_type_str = "duration";
   }
+  else if (dt == 10) {
+    expected_type = arrow::Type::BINARY;
+    expected_type_str = "binary";
+  }
   else {
     throw std::invalid_argument(std::string("unknown datatype ") + std::to_string(dt));
   }
@@ -922,6 +926,38 @@ value fast_col_read(value tbl, value col_idx) {
           int len = 0;
           char *ptr = (char*)str_array->GetValue(row_index, &len);
           Store_field(ocaml_array, res_index++, caml_alloc_initialized_string(len, ptr));
+        }
+      }
+    }
+  }
+  else if (arrow::Type::BINARY == dt) {
+    ocaml_array = caml_alloc_tuple(total_len);
+    tag = has_null ? 1 : 0;
+    long int res_index = 0;
+    for (int chunk_idx = 0; chunk_idx < array->num_chunks(); ++chunk_idx) {
+      std::shared_ptr<arrow::Array> chunk = array->chunk(chunk_idx);
+      auto bin_array = std::dynamic_pointer_cast<arrow::BinaryArray>(chunk);
+      if (bin_array == nullptr) throw std::invalid_argument("not a binary array");
+      int64_t chunk_len = bin_array->length();
+      if (has_null) {
+        for (int64_t row_index = 0; row_index < chunk_len; ++row_index) {
+          if (bin_array->IsValid(row_index)) {
+            some = caml_alloc_tuple(1);
+            int len = 0;
+            const uint8_t *ptr = bin_array->GetValue(row_index, &len);
+            Store_field(some, 0, caml_alloc_initialized_string(len, (char*)ptr));
+            Store_field(ocaml_array, res_index++, some);
+          }
+          else {
+            Store_field(ocaml_array, res_index++, Val_int(0));
+          }
+        }
+      }
+      else {
+        for (int64_t row_index = 0; row_index < chunk_len; ++row_index) {
+          int len = 0;
+          const uint8_t *ptr = bin_array->GetValue(row_index, &len);
+          Store_field(ocaml_array, res_index++, caml_alloc_initialized_string(len, (char*)ptr));
         }
       }
     }

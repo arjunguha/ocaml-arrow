@@ -140,6 +140,28 @@ module String_option_col : Col_intf with type elem = string option = struct
   let set t idx v = t.(idx) <- v
 end
 
+module Binary_col : Col_intf with type elem = string = struct
+  type t = string array
+  type elem = string
+
+  let init len = Array.create ~len ""
+  let of_table table name = C.read_binary table ~column:(`Name name)
+  let writer_col t name = W.binary t ~name
+  let get t idx = t.(idx)
+  let set t idx v = t.(idx) <- v
+end
+
+module Binary_option_col : Col_intf with type elem = string option = struct
+  type elem = string option
+  type t = elem array
+
+  let init len = Array.create ~len None
+  let of_table table name = C.read_binary_opt table ~column:(`Name name)
+  let writer_col t name = W.binary_opt t ~name
+  let get t idx = t.(idx)
+  let set t idx v = t.(idx) <- v
+end
+
 module Date_col : Col_intf with type elem = Core_kernel.Date.t = struct
   type elem = Core_kernel.Date.t
   type t = elem array
