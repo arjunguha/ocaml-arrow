@@ -13,9 +13,7 @@ build: [
   ["dune" "build" "-p" name "-j" jobs]
 ]
 run-test: [
-  ["env"
-   "LD_LIBRARY_PATH=%{build}%/vendor/arrow-install/lib"
-   "dune" "runtest" "-p" name "-j" jobs]
+  ["dune" "runtest" "-p" name "-j" jobs]
 ]
 
 depends: [
