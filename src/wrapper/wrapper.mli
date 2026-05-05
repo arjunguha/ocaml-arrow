@@ -282,7 +282,8 @@ module Writer : sig
     -> unit
 
   val with_row_group_writer
-    :  ?compression:Compression.t
+    :  ?batch_size:int
+    -> ?compression:Compression.t
     -> string
     -> f:(Row_group_writer.t -> 'a)
     -> 'a

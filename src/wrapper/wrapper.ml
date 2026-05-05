@@ -1554,12 +1554,30 @@ module Writer = struct
       { writer : C.Parquet_writer.t
       ; mutable closed : bool
       ; mutable schema : (string * string * int64) list
+      ; batch_size : int
+      ; mutable buffered : Table.t list
+      ; mutable buffered_rows : int
       }
+
+    let flush t =
+      match t.buffered with
+      | [] -> ()
+      | tables ->
+        let combined =
+          match tables with
+          | [ tbl ] -> tbl
+          | tables -> Table.concatenate (List.rev tables)
+        in
+        C.Parquet_writer.write_table t.writer combined;
+        t.buffered <- [];
+        t.buffered_rows <- 0
 
     let write_exn t ~cols =
       if t.closed
       then invalid_arg "Writer.Row_group_writer.write_exn: writer is closed";
-      ignore (validate_row_group_cols ~caller:"Writer.Row_group_writer.write_exn" ~cols);
+      let nrows =
+        validate_row_group_cols ~caller:"Writer.Row_group_writer.write_exn" ~cols
+      in
       let schema = List.map cols ~f:col_schema_signature in
       (match t.schema with
        | [] -> t.schema <- schema
@@ -1572,23 +1590,36 @@ module Writer = struct
         C.Table.create (Ctypes.addr array_struct) (Ctypes.addr schema_struct)
         |> Table.with_free
       in
-      C.Parquet_writer.write_table t.writer table;
       use_value cols;
-      Stdlib.Gc.finalise (fun _ -> use_value cols) table
+      Stdlib.Gc.finalise (fun _ -> use_value cols) table;
+      t.buffered <- table :: t.buffered;
+      t.buffered_rows <- t.buffered_rows + nrows;
+      if t.buffered_rows >= t.batch_size then flush t
 
     let close t =
       if not t.closed
       then (
+        flush t;
         C.Parquet_writer.close t.writer;
         t.closed <- true)
   end
 
-  let with_row_group_writer ?(compression = Compression.Snappy) filename ~f =
+  let with_row_group_writer
+        ?(batch_size = 1000)
+        ?(compression = Compression.Snappy)
+        filename
+        ~f
+    =
+    if batch_size < 1
+    then invalid_arg "Writer.with_row_group_writer: batch_size must be >= 1";
     let writer =
       { Row_group_writer.writer =
           C.Parquet_writer.open_ filename (Compression.to_cint compression)
       ; closed = false
       ; schema = []
+      ; batch_size
+      ; buffered = []
+      ; buffered_rows = 0
       }
     in
     Stdlib.Gc.finalise C.Parquet_writer.free writer.writer;

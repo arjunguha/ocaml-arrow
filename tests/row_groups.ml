@@ -23,7 +23,7 @@ let%expect_test "write parquet row groups incrementally" =
   let filename = Stdlib.Filename.temp_file "row-groups" ".parquet" in
   Exn.protect
     ~f:(fun () ->
-      Writer.with_row_group_writer filename ~f:(fun writer ->
+      Writer.with_row_group_writer filename ~batch_size:1 ~f:(fun writer ->
         Writer.Row_group_writer.write_exn writer ~cols:(row_group 0 3);
         Writer.Row_group_writer.write_exn writer ~cols:(row_group 3 2);
         Writer.Row_group_writer.write_exn writer ~cols:(row_group 5 4));
@@ -36,6 +36,47 @@ let%expect_test "write parquet row groups incrementally" =
     {|
     row groups: 3
     rows: 9
+    |}]
+
+let%expect_test "writes accumulate into batched row groups" =
+  let filename = Stdlib.Filename.temp_file "row-groups" ".parquet" in
+  Exn.protect
+    ~f:(fun () ->
+      Writer.with_row_group_writer filename ~batch_size:5 ~f:(fun writer ->
+        (* 4 rows: stays buffered. *)
+        Writer.Row_group_writer.write_exn writer ~cols:(row_group 0 4);
+        (* +3 rows -> 7 buffered, crosses 5, flushes one row group of 7. *)
+        Writer.Row_group_writer.write_exn writer ~cols:(row_group 4 3);
+        (* +2 rows: stays buffered, flushed at close as second row group. *)
+        Writer.Row_group_writer.write_exn writer ~cols:(row_group 7 2));
+      Stdio.printf
+        "row groups: %d\nrows: %d\n%!"
+        (parquet_num_row_groups filename)
+        (Parquet_reader.schema_and_num_rows filename |> snd))
+    ~finally:(fun () -> Stdlib.Sys.remove filename);
+  [%expect
+    {|
+    row groups: 2
+    rows: 9
+    |}]
+
+let%expect_test "default batch_size accumulates small writes into one row group" =
+  let filename = Stdlib.Filename.temp_file "row-groups" ".parquet" in
+  Exn.protect
+    ~f:(fun () ->
+      Writer.with_row_group_writer filename ~f:(fun writer ->
+        for i = 0 to 9 do
+          Writer.Row_group_writer.write_exn writer ~cols:(row_group i 1)
+        done);
+      Stdio.printf
+        "row groups: %d\nrows: %d\n%!"
+        (parquet_num_row_groups filename)
+        (Parquet_reader.schema_and_num_rows filename |> snd))
+    ~finally:(fun () -> Stdlib.Sys.remove filename);
+  [%expect
+    {|
+    row groups: 1
+    rows: 10
     |}]
 
 let%expect_test "row groups reject ragged columns" =
